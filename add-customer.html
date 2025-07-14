@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Add Customer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 40px;
+      background-color: #f8f9fa;
+    }
+    h2 {
+      text-align: center;
+    }
+    form {
+      max-width: 500px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 12px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Add Customer</h2>
+  <a href="free_hand_main_menu.html" style="position: fixed; top: 20px; left: 20px; background: #007bff; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">← Back</a>
+  
+  <form id="customerForm">
+    <label for="employee">Employee Name</label>
+    <select id="employee" name="employee" required>
+      <option value="" disabled selected>Select employee</option>
+    </select>
+
+    <label for="shop">Shop Name</label>
+    <input type="text" id="shop" name="shop" placeholder="Enter shop name" required>
+
+    <label for="name">Customer Name</label>
+    <input type="text" id="name" name="name" placeholder="Enter customer name" required>
+
+    <label for="mobile">Mobile Number</label>
+    <input type="tel" id="mobile" name="mobile" placeholder="Enter 10-digit mobile number" required pattern="[0-9]{10}" title="Enter a valid 10-digit mobile number">
+
+    <label for="address">Address</label>
+    <textarea id="address" name="address" rows="4" placeholder="Enter address"></textarea>
+
+    <button type="submit">Add Customer</button>
+  </form>
+
+  <script>
+    // Load employee names from localStorage
+    const employees = JSON.parse(localStorage.getItem('employees') || '[]');
+    const employeeSelect = document.getElementById('employee');
+    employees.forEach(emp => {
+      const option = document.createElement('option');
+      option.value = emp.name;
+      option.textContent = emp.name;
+      employeeSelect.appendChild(option);
+    });
+
+    document.getElementById('customerForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const customers = JSON.parse(localStorage.getItem('customers') || '[]');
+      const shopName = document.getElementById('shop').value;
+      const isDuplicate = customers.some(c => c.shop.toLowerCase() === shopName.toLowerCase());
+      if (isDuplicate) {
+        alert('Customer with this shop name already exists!');
+        return;
+      }
+
+      const customer = {
+        employee: document.getElementById('employee').value,
+        shop: shopName,
+        name: document.getElementById('name').value,
+        mobile: document.getElementById('mobile').value,
+        address: document.getElementById('address').value
+      };
+
+      customers.push(customer);
+      localStorage.setItem('customers', JSON.stringify(customers));
+
+      alert('Customer added successfully!');
+      this.reset();
+      window.location.href = 'customer-list.html';
+    });
+  </script>
+
+</body>
+</html>
