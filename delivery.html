@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Delivery Management</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body {
+      background-color: #f0f2f5;
+      padding: 20px;
+    }
+    .order-card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .status-alert {
+      font-weight: bold;
+    }
+    .details {
+      display: none;
+      margin-top: 10px;
+    }
+    .order-header {
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<a href="free_hand_main_menu.html"
+    style="position: fixed; top: 20px; left: 20px; background: #007bff; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px; z-index: 1000;">←
+    Back</a>
+<h2 class="text-center mb-3">🚚 Delivery & Payment</h2>
+
+<div class="mb-4 text-center">
+  <input type="text" id="searchInput" class="form-control w-50 mx-auto" placeholder="Search by shop/customer name...">
+</div>
+
+<div id="deliveryContainer"></div>
+
+<script>
+  let allOrders = [];
+
+  function loadDeliveries(filterText = "") {
+    const container = document.getElementById("deliveryContainer");
+    container.innerHTML = '';
+    const orders = JSON.parse(localStorage.getItem("orders") || "[]");
+
+    allOrders = orders.filter(order => order.status === "Dispatched");
+
+    const filteredOrders = filterText
+      ? allOrders.filter(order => order.customer.toLowerCase().includes(filterText.toLowerCase()))
+      : allOrders;
+
+    if (filteredOrders.length === 0) {
+      container.innerHTML = "<p class='text-center'>No dispatched orders found.</p>";
+      return;
+    }
+
+    filteredOrders.forEach(order => {
+      const div = document.createElement("div");
+      div.className = "order-card";
+
+      div.innerHTML = `
+        <div class="order-header" onclick="toggleDetails(this)">
+          <h5>Order #${order.id} - ${order.customer}</h5>
+        </div>
+
+        <div class="details">
+          <p><strong>Date:</strong> ${order.orderDate || '-'}</p>
+          <p><strong>Employee:</strong> ${order.employee || '-'}</p>
+          <p><strong>Total Bill:</strong> ₹${order.totalAmount}</p>
+          <p><strong>Products:</strong></p>
+          <ul>
+            ${(order.products || []).map(p =>
+              `<li>${p.name} - ${p.packing} × ${p.quantity} = ₹${p.price * p.quantity}</li>`
+            ).join('')}
+          </ul>
+
+          <div class="mb-2">
+            <label>Payment Type:</label>
+            <select class="form-select payment-mode">
+              <option value="Cash">Cash</option>
+              <option value="GPay">GPay</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div class="mb-2">
+            <label>Amount Received:</label>
+            <input type="number" class="form-control amount-received" placeholder="₹">
+          </div>
+
+          <div class="mb-2 transaction-section" style="display:none;">
+            <label>Transaction ID (for GPay):</label>
+            <input type="text" class="form-control transaction-id" placeholder="Enter transaction ID">
+          </div>
+
+          <p class="status-alert text-danger">Status: Payment Pending ⚠️</p>
+
+          <button class="btn btn-success deliver-btn">Mark as Delivered ✅</button>
+        </div>
+      `;
+
+      const mode = div.querySelector('.payment-mode');
+      const amountInput = div.querySelector('.amount-received');
+      const statusAlert = div.querySelector('.status-alert');
+      const transSection = div.querySelector('.transaction-section');
+      const transIdInput = div.querySelector('.transaction-id');
+      const deliverBtn = div.querySelector('.deliver-btn');
+
+      // Show/hide transaction section based on payment mode
+      mode.addEventListener("change", () => {
+        transSection.style.display = mode.value === "GPay" ? "block" : "none";
+      });
+
+      // Auto-validate payment amount
+      amountInput.addEventListener("input", () => {
+        const amount = parseFloat(amountInput.value);
+        if (amount === parseFloat(order.totalAmount)) {
+          statusAlert.textContent = "Status: No Payment Pending ✅";
+          statusAlert.classList.remove("text-danger");
+          statusAlert.classList.add("text-success");
+        } else {
+          statusAlert.textContent = "Status: Payment Pending ⚠️";
+          statusAlert.classList.remove("text-success");
+          statusAlert.classList.add("text-danger");
+        }
+      });
+
+      deliverBtn.addEventListener("click", () => {
+        const amount = parseFloat(amountInput.value);
+        if (!amount || isNaN(amount)) {
+          alert("Please enter the received amount.");
+          return;
+        }
+
+        if (mode.value === "GPay" && !transIdInput.value.trim()) {
+          alert("Please enter the GPay transaction ID.");
+          return;
+        }
+
+        const paymentStatus = amount === parseFloat(order.totalAmount) ? "No Payment Pending" : "Payment Pending";
+
+        const ordersList = JSON.parse(localStorage.getItem("orders") || "[]");
+        const index = ordersList.findIndex(o => o.id === order.id);
+        if (index !== -1) {
+          ordersList[index].status = "Delivered";
+          ordersList[index].paymentStatus = paymentStatus;
+          ordersList[index].paymentMode = mode.value;
+          ordersList[index].amountReceived = amount;
+          ordersList[index].transactionId = transIdInput.value.trim();
+          localStorage.setItem("orders", JSON.stringify(ordersList));
+        }
+
+        alert("Order marked as Delivered.");
+        loadDeliveries(document.getElementById('searchInput').value);
+      });
+
+      container.appendChild(div);
+    });
+  }
+
+  function toggleDetails(headerElement) {
+    const details = headerElement.nextElementSibling;
+    if (details.style.display === "none" || details.style.display === "") {
+      details.style.display = "block";
+    } else {
+      details.style.display = "none";
+    }
+  }
+
+  document.getElementById("searchInput").addEventListener("input", (e) => {
+    loadDeliveries(e.target.value);
+  });
+
+  window.onload = () => loadDeliveries();
+</script>
+
+</body>
+</html>

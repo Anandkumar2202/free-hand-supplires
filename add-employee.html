@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Add Employee</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="p-4">
+  <a href="free_hand_main_menu.html"
+    style="position: fixed; top: 20px; left: 20px; background: #007bff; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px; z-index: 1000;">←
+    Back</a>  
+  <div class="container">
+    <h2 class="text-center mb-4 text-primary">Free Hand Suppliers</h2>
+    <h4 class="mb-4 text-success">🧑‍💼 Add Employee Form</h4>
+
+    <form id="employeeForm">
+      <div class="mb-3">
+        <label for="name" class="form-label">Name of the Employee</label>
+        <input class="form-control" id="name" required />
+      </div>
+
+      <div class="mb-3">
+        <label for="address" class="form-label">Residential Address</label>
+        <input class="form-control" id="address" />
+      </div>
+
+      <div class="mb-3">
+        <label for="doj" class="form-label">Date of Joining</label>
+        <input class="form-control" id="doj" type="date" />
+      </div>
+
+      <div class="mb-3">
+        <label for="salary" class="form-label">Monthly Salary (in ₹)</label>
+        <input class="form-control" id="salary" type="number" />
+      </div>
+
+      <div class="mb-3">
+        <label for="designation" class="form-label">Designation / Role</label>
+        <input class="form-control" id="designation" />
+      </div>
+
+      <div class="mb-3">
+        <label for="aadhar" class="form-label">Aadhar Number</label>
+        <input class="form-control" id="aadhar" />
+      </div>
+
+      <button class="btn btn-success mt-2" type="submit">Save Employee</button>
+    </form>
+  </div>
+
+  <script>
+    document.getElementById('employeeForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const employee = {
+        name: document.getElementById('name').value,
+        address: document.getElementById('address').value,
+        doj: document.getElementById('doj').value,
+        salary: document.getElementById('salary').value,
+        designation: document.getElementById('designation').value,
+        aadhar: document.getElementById('aadhar').value
+      };
+
+      // Save to localStorage
+      const employees = JSON.parse(localStorage.getItem('employees') || '[]');
+      employees.push(employee);
+      localStorage.setItem('employees', JSON.stringify(employees));
+
+      alert('Employee added successfully!');
+      
+      // Reset form
+      this.reset();
+      
+      // Redirect to employee list
+      window.location.href = 'employee.html';
+    });
+  </script>
+</body>
+</html>

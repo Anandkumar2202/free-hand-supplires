@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Employee Orders</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f8f9fa;
+      padding: 20px;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+    .filter-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .table-container {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .order-link {
+      color: #007bff;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<a href="employee.html"
+   style="position: fixed; top: 20px; left: 20px; background: #007bff; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px; z-index: 1000;">← Back</a>
+
+<div class="container">
+  <div class="header">
+    <h2>📦 Orders by <span id="empNameHeader"></span></h2>
+    <p>Total Earnings: ₹<span id="totalEarnings">0</span></p>
+  </div>
+
+  <div class="filter-bar">
+    <select id="shopFilter" class="form-select w-auto">
+      <option value="">Filter by Shop</option>
+    </select>
+    <input type="date" id="startDate" class="form-control w-auto" />
+    <input type="date" id="endDate" class="form-control w-auto" />
+    <button class="btn btn-primary" onclick="applyFilters()">🔍 Filter</button>
+    <button class="btn btn-success" onclick="exportToExcel()">⬇️ Export</button>
+  </div>
+
+  <div class="table-container">
+    <table class="table table-striped" id="orderTable">
+      <thead class="table-dark">
+        <tr>
+          <th>Order No.</th>
+          <th>Date</th>
+          <th>Shop</th>
+          <th>Total (₹)</th>
+          <th>Amount Received</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="orderBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Order Summary Modal -->
+<div class="modal fade" id="orderModal" tabindex="-1" aria-labelledby="orderModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="orderModalLabel">Order Summary</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="modalContent">
+        <!-- Summary content gets injected here -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const urlParams = new URLSearchParams(window.location.search);
+  const empName = urlParams.get("emp");
+  document.getElementById("empNameHeader").textContent = empName || "Employee";
+
+  const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+  const employeeOrders = orders.filter(o => o.employee === empName);
+
+  const shopFilter = document.getElementById('shopFilter');
+  const orderBody = document.getElementById('orderBody');
+
+  const shopNames = [...new Set(employeeOrders.map(o => o.customer))];
+  shopNames.forEach(shop => {
+    const opt = document.createElement("option");
+    opt.value = shop;
+    opt.textContent = shop;
+    shopFilter.appendChild(opt);
+  });
+
+  function applyFilters() {
+    const shop = shopFilter.value;
+    const start = document.getElementById('startDate').value;
+    const end = document.getElementById('endDate').value;
+
+    const filtered = employeeOrders.filter(order => {
+      const date = order.orderDate || order.date;
+      const dateOk = (!start || new Date(date) >= new Date(start)) &&
+                     (!end || new Date(date) <= new Date(end));
+      const shopOk = !shop || order.customer === shop;
+      return dateOk && shopOk;
+    });
+
+    renderOrders(filtered);
+  }
+
+  function renderOrders(orderList) {
+    orderBody.innerHTML = '';
+    let total = 0;
+
+    if (orderList.length === 0) {
+      orderBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">No orders found.</td></tr>`;
+      document.getElementById("totalEarnings").textContent = "0";
+      return;
+    }
+
+    orderList.forEach(o => {
+      total += parseFloat(o.amountReceived || 0);
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><span class="order-link" onclick="showOrderSummary(${o.id})">${o.id || 'N/A'}</span></td>
+        <td>${o.orderDate || o.date || 'N/A'}</td>
+        <td>${o.customer}</td>
+        <td>₹${o.totalAmount || 0}</td>
+        <td>₹${o.amountReceived || 0}</td>
+        <td>${o.status || 'Pending'}</td>
+      `;
+      orderBody.appendChild(row);
+    });
+
+    document.getElementById("totalEarnings").textContent = total.toFixed(2);
+  }
+
+  function showOrderSummary(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const productList = (order.products || []).map(p =>
+      `<li>${p.name} - ${p.packing} × ${p.quantity} = ₹${p.quantity * p.price}</li>`
+    ).join('');
+
+    const pending = (order.totalAmount - (order.amountReceived || 0)).toFixed(2);
+
+    document.getElementById("modalContent").innerHTML = `
+      <h5>🧾 Order #${order.id}</h5>
+      <p><strong>Date:</strong> ${order.orderDate || order.date || '-'}</p>
+      <p><strong>Customer:</strong> ${order.customer}</p>
+      <p><strong>Employee:</strong> ${order.employee}</p>
+      <p><strong>Total Amount:</strong> ₹${order.totalAmount}</p>
+      <p><strong>Amount Received:</strong> ₹${order.amountReceived || 0}</p>
+      <p><strong>Pending:</strong> ₹${pending}</p>
+      <p><strong>Payment Status:</strong> ${order.paymentStatus || '-'}</p>
+      <p><strong>Payment Mode:</strong> ${order.paymentMode || '-'}</p>
+      <p><strong>Transaction ID:</strong> ${order.transactionId || '-'}</p>
+      <p><strong>Products:</strong></p>
+      <ul>${productList}</ul>
+    `;
+
+    new bootstrap.Modal(document.getElementById("orderModal")).show();
+  }
+
+  function exportToExcel() {
+    const table = document.getElementById("orderTable");
+    const workbook = XLSX.utils.table_to_book(table, {sheet: "Orders"});
+    XLSX.writeFile(workbook, empName + "_Orders.xlsx");
+  }
+
+  renderOrders(employeeOrders);
+</script>
+
+</body>
+</html>

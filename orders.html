@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Order Management</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f7fa;
+      padding: 20px;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .order-card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+      padding: 20px;
+    }
+
+    .status-badge {
+      font-size: 14px;
+      padding: 5px 10px;
+      border-radius: 20px;
+    }
+
+    .pending {
+      background-color: #ffc107;
+      color: black;
+    }
+
+    .dispatched {
+      background-color: #28a745;
+      color: white;
+    }
+
+    .filter-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .filter-group input,
+    .filter-group select {
+      flex: 1;
+      min-width: 180px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <a href="free_hand_main_menu.html"
+    style="position: fixed; top: 20px; left: 20px; background: #007bff; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px; z-index: 1000;">←
+    Back</a>
+
+  <div class="container">
+    <h2>📋 Orders</h2>
+
+    <div class="filter-group">
+      <select id="paymentFilter" class="form-select">
+        <option value="all">Payment: All</option>
+        <option value="completed">Payment: Completed</option>
+        <option value="pending">Payment: Pending</option>
+      </select>
+
+      <select id="dispatchFilter" class="form-select">
+        <option value="all">Dispatch: All</option>
+        <option value="completed">Dispatch: Completed</option>
+        <option value="pending">Dispatch: Pending</option>
+      </select>
+
+      <input type="text" id="shopSearch" class="form-control" placeholder="Search Shop Name">
+      <input type="date" id="dateFilter" class="form-control">
+
+      <button class="btn btn-success" onclick="exportToExcel()">📥 Export to Excel</button>
+    </div>
+
+    <div id="ordersContainer"></div>
+  </div>
+
+  <script>
+    let allOrders = [];
+    let lastDisplayedOrders = [];
+
+    function loadOrders() {
+      allOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const paymentVal = document.getElementById('paymentFilter').value;
+      const dispatchVal = document.getElementById('dispatchFilter').value;
+      const shopSearch = document.getElementById('shopSearch').value.toLowerCase();
+      const selectedDate = document.getElementById('dateFilter').value;
+
+      let filtered = [...allOrders];
+
+      if (paymentVal === 'completed') {
+        filtered = filtered.filter(o => o.paymentStatus === 'No Payment Pending');
+      } else if (paymentVal === 'pending') {
+        filtered = filtered.filter(o => o.paymentStatus === 'Payment Pending');
+      }
+
+      if (dispatchVal === 'completed') {
+        filtered = filtered.filter(o => o.status === 'Dispatched' || o.status === 'Delivered');
+      } else if (dispatchVal === 'pending') {
+        filtered = filtered.filter(o => o.status !== 'Dispatched' && o.status !== 'Delivered');
+      }
+
+      if (shopSearch) {
+        filtered = filtered.filter(o => o.customer?.toLowerCase().includes(shopSearch));
+      }
+
+      if (selectedDate) {
+        filtered = filtered.filter(o => o.orderDate === selectedDate);
+      }
+
+      lastDisplayedOrders = filtered;
+      displayOrders(filtered);
+    }
+
+    function displayOrders(orders) {
+      const container = document.getElementById("ordersContainer");
+      container.innerHTML = '';
+
+      if (orders.length === 0) {
+        container.innerHTML = '<p class="text-center">No matching orders found.</p>';
+        return;
+      }
+
+      orders.forEach(order => {
+        let status = order.status || 'Pending';
+        let statusClass = 'pending';
+
+        if (order.status === 'Delivered') {
+          if (order.paymentStatus === 'No Payment Pending') {
+            status = 'Delivered ✅';
+            statusClass = 'dispatched';
+          } else {
+            status = 'Payment Pending ⚠️';
+            statusClass = 'pending';
+          }
+        } else if (order.status === 'Dispatched') {
+          status = 'Dispatched 🚚';
+          statusClass = 'dispatched';
+        }
+
+        const pendingAmount = order.amountReceived !== undefined
+          ? (order.totalAmount - order.amountReceived).toFixed(2)
+          : null;
+
+        const card = document.createElement('div');
+        card.className = 'order-card';
+        card.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h5>Order #${order.id}</h5>
+          <span class="status-badge ${statusClass}">${status}</span>
+        </div>
+        <p><strong>Date:</strong> ${order.orderDate || '-'}</p>
+        <p><strong>Employee:</strong> ${order.employee || '-'}</p>
+        <p><strong>Customer:</strong> ${order.customer || '-'}</p>
+        <p><strong>Total:</strong> ₹${order.totalAmount || 0}</p>
+        ${pendingAmount !== null ? `<p><strong>Pending Amount:</strong> ₹${pendingAmount}</p>` : ''}
+        ${order.paymentStatus ? `<p><strong>Payment Status:</strong> ${order.paymentStatus}</p>` : ''}
+        ${order.amountReceived ? `<p><strong>Amount Received:</strong> ₹${order.amountReceived}</p>` : ''}
+        ${order.paymentMode ? `<p><strong>Payment Mode:</strong> ${order.paymentMode}</p>` : ''}
+        ${order.transactionId ? `<p><strong>Transaction ID:</strong> ${order.transactionId}</p>` : ''}
+        <p><strong>Products:</strong></p>
+        <ul>
+          ${(order.products || []).map(p => `<li>${p.name} - ${p.packing} × ${p.quantity} = ₹${p.price * p.quantity}</li>`).join('')}
+        </ul>
+        ${order.status !== 'Dispatched' && order.status !== 'Delivered'
+            ? `<button class="btn btn-sm btn-primary me-2" onclick="dispatchOrder(${order.id})">Dispatch</button>`
+            : ''}
+<button class="btn btn-sm btn-secondary" onclick="printOrder(${order.id})">🖨️ Print</button>
+
+      `;
+        container.appendChild(card);
+      });
+    }
+
+    function dispatchOrder(orderId) {
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      const inventory = JSON.parse(localStorage.getItem('inventory') || '[]');
+      const orderIndex = orders.findIndex(o => o.id === orderId);
+      if (orderIndex === -1) return;
+
+      orders[orderIndex].products?.forEach(op => {
+        const productIndex = inventory.findIndex(inv => inv.name === op.name);
+        if (productIndex !== -1) {
+          let multiplier = 1;
+          if (op.packing === '5 kg') multiplier = 5;
+          else if (op.packing === '10 kg') multiplier = 10;
+          else if (op.packing === '1 bag') multiplier = 30;
+          const totalKg = op.quantity * multiplier;
+          inventory[productIndex].stock = Math.max(0, inventory[productIndex].stock - totalKg);
+        }
+      });
+
+      orders[orderIndex].status = 'Dispatched';
+      localStorage.setItem('orders', JSON.stringify(orders));
+      localStorage.setItem('inventory', JSON.stringify(inventory));
+      loadOrders();
+    }
+    function printOrder(orderId) {
+      const order = allOrders.find(o => o.id === orderId);
+      if (!order) return;
+
+      const productList = (order.products || [])
+        .map(p => `<li>${p.name} - ${p.packing} × ${p.quantity} = ₹${p.price * p.quantity}</li>`)
+        .join('');
+
+      const pendingAmount = order.amountReceived !== undefined
+        ? (order.totalAmount - order.amountReceived).toFixed(2)
+        : null;
+
+      const content = `
+    <html>
+    <head>
+      <title>Order #${order.id}</title>
+      <style>
+        body { font-family: Arial; padding: 20px; }
+        h2 { text-align: center; }
+        ul { padding-left: 20px; }
+        p { margin: 5px 0; }
+      </style>
+    </head>
+    <body>
+      <h2>Order #${order.id}</h2>
+      <p><strong>Date:</strong> ${order.orderDate || '-'}</p>
+      <p><strong>Employee:</strong> ${order.employee || '-'}</p>
+      <p><strong>Customer:</strong> ${order.customer || '-'}</p>
+      <p><strong>Total Amount:</strong> ₹${order.totalAmount || 0}</p>
+      ${pendingAmount !== null ? `<p><strong>Pending Amount:</strong> ₹${pendingAmount}</p>` : ''}
+      ${order.paymentStatus ? `<p><strong>Payment Status:</strong> ${order.paymentStatus}</p>` : ''}
+      ${order.amountReceived ? `<p><strong>Amount Received:</strong> ₹${order.amountReceived}</p>` : ''}
+      ${order.paymentMode ? `<p><strong>Payment Mode:</strong> ${order.paymentMode}</p>` : ''}
+      ${order.transactionId ? `<p><strong>Transaction ID:</strong> ${order.transactionId}</p>` : ''}
+      <p><strong>Products:</strong></p>
+      <ul>${productList}</ul>
+    </body>
+    </html>
+  `;
+
+      const printWin = window.open('', '', 'width=800,height=600');
+      printWin.document.write(content);
+      printWin.document.close();
+      printWin.focus();
+      printWin.print();
+      printWin.close();
+    }
+
+    function exportToExcel() {
+      if (lastDisplayedOrders.length === 0) {
+        alert("No data to export.");
+        return;
+      }
+
+      const rows = [["Order ID", "Date", "Customer", "Employee", "Total", "Pending Amount", "Payment Status", "Payment Mode", "Amount Received", "Transaction ID", "Status", "Products"]];
+
+      lastDisplayedOrders.forEach(order => {
+        const productList = (order.products || []).map(p => `${p.name} (${p.packing}) × ${p.quantity}`).join(" | ");
+        const pendingAmount = order.amountReceived !== undefined ? (order.totalAmount - order.amountReceived).toFixed(2) : "";
+        rows.push([
+          order.id,
+          order.orderDate || "",
+          order.customer || "",
+          order.employee || "",
+          order.totalAmount || "",
+          pendingAmount,
+          order.paymentStatus || "",
+          order.paymentMode || "",
+          order.amountReceived || "",
+          order.transactionId || "",
+          order.status || "",
+          productList
+        ]);
+      });
+
+      const csvContent = rows.map(e => e.map(f => `"${String(f).replace(/"/g, '""')}"`).join(",")).join("\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "orders_report.csv";
+      link.click();
+    }
+
+    document.getElementById('paymentFilter').addEventListener('change', applyFilters);
+    document.getElementById('dispatchFilter').addEventListener('change', applyFilters);
+    document.getElementById('shopSearch').addEventListener('input', applyFilters);
+    document.getElementById('dateFilter').addEventListener('change', applyFilters);
+
+    window.onload = loadOrders;
+  </script>
+</body>
+
+</html>
